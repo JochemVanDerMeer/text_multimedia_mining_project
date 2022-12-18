@@ -1,16 +1,24 @@
 import spacy
 import pandas as pd
+import numpy as np
 from nltk.tokenize import sent_tokenize
 from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
 
 df = pd.read_excel('small_airline_reviews.xlsx')
 nlp = spacy.load("en_core_web_sm")
+query_words_seatcomfort = ['seatcomfort', 'seat comfort', 'comfortable']
 query_words_cabinservice = ['cabin service', 'inflight service', 'in-flight service', 'cabin-service', 'service in the cabin', 'flight service', 'onboard service', 'on-board service', 'flight crew', 'cabin crew']
+query_words_foodbev = ['food', 'meal', 'drink', 'beverage', 'foodservice', 'mealservice', 'cafe', 'food service']
+query_words_entertainment = ['movie', 'screen', 'entertainment', 'film']
+query_words_groundservice = ['groundservice', 'ground service', 'service on the ground', 'check-in', 'check in']
+query_words_valueformoney = ['value for money', 'good value', 'cheap', 'expensive', 'price', 'fare', 'cost']
+
 punc = '''!()-[]{};:'"\,<>./?@#$%^&*_~'''
+airlines_list = []
 
 le = preprocessing.LabelEncoder()
 
@@ -29,16 +37,17 @@ def specify_label(label):
     else:
         return 0
 
-def get_sentences():
+def get_sentences(service_aspect, query_words):
     res = []
     new_df = clean_df(df)
     for idx, row in new_df.iterrows():
-        if str(row['customer_review']) != 'nan' and str(row['cabin_service']) != 'nan':
-            for queryword in query_words_cabinservice:
+        if str(row['customer_review']) != 'nan' and str(row[service_aspect]) != 'nan':
+            for queryword in query_words:
                 for idx, val in enumerate(sent_tokenize(row['customer_review'])):
                     if queryword in val:
-                        label = specify_label(row['cabin_service'])
-                        res.append([idx, sent_tokenize(row['customer_review'])[idx], label])
+                        label = specify_label(row[service_aspect])
+                        res.append([idx, sent_tokenize(row['customer_review'])[idx], label, row['airline']])
+                        #res.append([idx, sent_tokenize(row['customer_review'])[idx], row['cabin_service']])
                         break
     return res
 
@@ -54,9 +63,9 @@ def preprocess_sentences(ls):
         i[1] = tokens
     return ls
 
-def show_results():
+def show_results(service_aspect):
     # shows the result per sentence that contains a matched query
-    for i in preprocess_sentences(get_sentences()):
+    for i in preprocess_sentences(get_sentences(service_aspect)):
         for j in i:
             print(j)
         print('\n\n')       
@@ -70,13 +79,14 @@ def create_x_and_y(ls):
         y_set.append(i[2])
     return x_set, y_set
 
-def split_train_test():
+def split_train_test(service_aspect, query_words):
     #splitting the data in train set and test set
-    x_set, y_set = create_x_and_y(preprocess_sentences(get_sentences()))
+    x_set, y_set = create_x_and_y(preprocess_sentences(get_sentences(service_aspect, query_words)))
     x_train, x_test, y_train, y_test = train_test_split(x_set, y_set)
     return x_train, x_test, y_train, y_test
 
 def padding_or_truncate_set(set):
+    #normalizing the reviews, as each review gets the same length through either padding or truncating
     N = 20
     for i in set:  
         i += [''] * (N - len(i))
@@ -89,15 +99,22 @@ def padding_or_truncate_set(set):
             set[i] = set[i][0:N]
     return set
 
-def sentiment_analysis():
+def sentiment_analysis(service_aspect, query_words):
     logisticRegr = LogisticRegression()
     clf = RandomForestClassifier(max_depth=2, random_state=0)
-    x_train, x_test, y_train, y_test = split_train_test()
+    ada = AdaBoostClassifier(n_estimators=100, random_state=0)
+    x_train, x_test, y_train, y_test = split_train_test(service_aspect, query_words)
     x_train = padding_or_truncate_set(x_train)
     x_test = padding_or_truncate_set(x_test)
-    clf.fit(x_train, y_train)
-    prediction = clf.predict(x_test)
+    ada.fit(x_train, y_train)
+    prediction = ada.predict(x_test)
     print(classification_report(y_test, prediction))
 
-sentiment_analysis()
 
+#service_aspects = ['cabin_service', ...]
+sentiment_analysis('seat_comfort', query_words_seatcomfort)
+#sentiment_analysis('cabin_service', query_words_cabinservice)
+#sentiment_analysis('food_bev', query_words_foodbev)
+#sentiment_analysis('entertainment', query_words_entertainment)
+#sentiment_analysis('ground_service', query_words_groundservice)
+#sentiment_analysis('value_for_money', query_words_valueformoney)
