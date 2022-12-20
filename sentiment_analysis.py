@@ -6,6 +6,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report
 from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from collections import defaultdict
 
 #df = pd.read_excel('capstone_airline_reviews_untouched.xlsx')
 df = pd.read_excel('small_airline_reviews.xlsx')
@@ -65,15 +66,15 @@ def preprocess_sentences(ls):
         i[1] = tokens
     return ls
 
-def show_results(service_aspect, query_words):
+def show_query_results(service_aspect, query_words):
     # shows the result per sentence that contains a matched query
     for i in preprocess_sentences(get_sentences(service_aspect, query_words)):
         for j in i:
             print(j)
         print('\n\n')       
-#show_results('cabin_service', query_words_cabinservice)
 
 def flatten(l):
+    #used to flatten a list
     return [item for sublist in l for item in sublist]
 
 def create_x_and_y(ls):
@@ -89,12 +90,12 @@ def split_train_test(service_aspect, query_words):
     #splitting the data in train set and test set
     x_set, y_set = create_x_and_y(preprocess_sentences(get_sentences(service_aspect, query_words)))
     x_train, x_test, y_train, y_test = train_test_split(x_set, y_set)
-    for idx,val in enumerate(x_train):
-        reviews_x_train.append((val[0]))
-        airlines_x_train.append(flatten(val[1]))
-    for idx,val in enumerate(x_test):
-        reviews_x_test.append((val[0]))
-        airlines_x_test.append(flatten(val[1]))
+    for i in x_train:
+        reviews_x_train.append((i[0]))
+        airlines_x_train.append(flatten(i[1]))
+    for j in x_test:
+        reviews_x_test.append((j[0]))
+        airlines_x_test.append(flatten(j[1]))
     return reviews_x_train, reviews_x_test, y_train, y_test
 
 def padding_or_truncate_set(set):
@@ -111,10 +112,25 @@ def padding_or_truncate_set(set):
             set[i] = set[i][0:N]
     return set
 
+def get_results_per_airline(ls):
+    #this returns a dictionary with the number of sentiments found and the cumulative sentiment score
+    res = defaultdict(int)
+    for i in ls:
+        res[i[0]] += i[1]
+        sizestring = i[0] + '_size'
+        res[sizestring] += 1
+    return dict(res)
+
+def compute_average_sentiment(res_dict):
+    #this returns the average sentiment per airline
+    res = {}
+    for i in low_cost_airlines:
+        if i in res_dict:
+            size_string = i + '_size'
+            res[i] = res_dict[i] / res_dict[size_string]
+    return res
 
 def sentiment_analysis(service_aspect, query_words):
-    logisticRegr = LogisticRegression()
-    clf = RandomForestClassifier(max_depth=2, random_state=0)
     ada = AdaBoostClassifier(n_estimators=100, random_state=0)
     x_train, x_test, y_train, y_test = split_train_test(service_aspect, query_words)
     x_train = padding_or_truncate_set(x_train)
@@ -123,9 +139,11 @@ def sentiment_analysis(service_aspect, query_words):
     prediction = ada.predict(x_test)
     print(classification_report(y_test, prediction))
     airlines_x_test1 = ["".join(x) for x in airlines_x_test]
-    predictions_airlines = list(zip(prediction, airlines_x_test1))
-    res = [prediction for prediction in predictions_airlines if prediction[1] in low_cost_airlines]
-    print(res)
+    predictions_airlines = list(zip(airlines_x_test1, prediction))
+    res = [prediction for prediction in predictions_airlines if prediction[0] in low_cost_airlines]
+    #print(get_results_per_airline(res))
+    print(compute_average_sentiment(get_results_per_airline(res)))
+
 
 
 
