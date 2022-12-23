@@ -3,21 +3,21 @@ import pandas as pd
 from nltk.tokenize import sent_tokenize
 from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report
-from sklearn.ensemble import RandomForestClassifier, AdaBoostClassifier
+from sklearn.neighbors import KNeighborsClassifier
 from collections import defaultdict
 
-#df = pd.read_excel('capstone_airline_reviews_untouched.xlsx')
-df = pd.read_excel('small_airline_reviews.xlsx')
+df = pd.read_excel('capstone_airline_reviews_untouched.xlsx')
 nlp = spacy.load("en_core_web_sm")
-query_words_seatcomfort = ['seatcomfort', 'seat comfort', 'comfortable', 'comfy', 'seat', 'chair', 'legroom', 'leg room']
+
+query_words_seatcomfort = ['seatcomfort', 'seat comfort', 'comfortable', 'comfy', 'seat', 'chair', 'legroom', 'leg room', 'legspace', 'leg space']
 query_words_cabinservice = ['cabin service', 'inflight service', 'in-flight service', 'cabin-service', 'service in the cabin', 'flight service', 'onboard service', 'on-board service', 'flight crew', 'cabin crew']
-query_words_foodbev = ['food', 'meal', 'drink', 'beverage', 'foodservice', 'mealservice', 'cafe', 'food service']
-query_words_entertainment = ['movie', 'screen', 'entertainment', 'film']
+query_words_foodbev = ['food', 'meal', 'drink', 'beverage', 'foodservice', 'mealservice', 'cafe', 'food service', 'snack']
+query_words_entertainment = ['movie', 'screen', 'entertainment', 'film', 'tv']
 query_words_groundservice = ['groundservice', 'ground service', 'service on the ground', 'check-in', 'check in']
 query_words_valueformoney = ['value for money', 'good value', 'cheap', 'expensive', 'price', 'fare', 'cost']
-low_cost_airlines = ['Air Arabia', 'AirAsia', 'easyJet', 'Eurowings', 'flydubai', 'Frontier Airlines', 'Germanwings', 'IndiGo', 'Jetblue Airways', 'Norwegian', 'Pegasus Airlines', 'Ryanair', 'Southwest Airlines', 'Spirit Airlines', 'Sunwing Airilnes', 'Virgin America', 'Vueling Airlines', 'Wizz Air', 'WOW air']
+
+low_cost_airlines = ['Air Arabia', 'AirAsia', 'easyJet', 'Eurowings', 'flydubai', 'Frontier Airlines', 'Germanwings', 'IndiGo', 'Jetblue Airways', 'Norwegian', 'Pegasus Airlines', 'Ryanair', 'Southwest Airlines', 'Spirit Airlines', 'Sunwing Airlines', 'Virgin America', 'Vueling Airlines', 'Wizz Air', 'WOW air']
 
 punc = '''!()-[]{};:'"\,<>./?@#$%^&*_~'''
 airlines_list = []
@@ -131,23 +131,22 @@ def compute_average_sentiment(res_dict):
     return res
 
 def sentiment_analysis(service_aspect, query_words):
-    ada = AdaBoostClassifier(n_estimators=100, random_state=0)
+    neigh = KNeighborsClassifier(n_neighbors=3)
     x_train, x_test, y_train, y_test = split_train_test(service_aspect, query_words)
     x_train = padding_or_truncate_set(x_train)
     x_test = padding_or_truncate_set(x_test)
-    ada.fit(x_train, y_train)
-    prediction = ada.predict(x_test)
+    neigh.fit(x_train, y_train)
+    prediction = neigh.predict(x_test)
     print(classification_report(y_test, prediction))
     airlines_x_test1 = ["".join(x) for x in airlines_x_test]
     predictions_airlines = list(zip(airlines_x_test1, prediction))
     res = [prediction for prediction in predictions_airlines if prediction[0] in low_cost_airlines]
-    #print(get_results_per_airline(res))
-    print(compute_average_sentiment(get_results_per_airline(res)))
+    result = compute_average_sentiment(get_results_per_airline(res))
+    for key,value in result.items():
+        print(key,value)
 
-
-
-
-sentiment_analysis('seat_comfort', query_words_seatcomfort)
+#uncomment a line below to get results
+#sentiment_analysis('seat_comfort', query_words_seatcomfort)
 #sentiment_analysis('cabin_service', query_words_cabinservice)
 #sentiment_analysis('food_bev', query_words_foodbev)
 #sentiment_analysis('entertainment', query_words_entertainment)
